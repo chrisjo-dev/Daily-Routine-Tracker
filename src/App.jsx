@@ -1,14 +1,39 @@
 import { useState, useEffect, useCallback } from "react";
 
 const ROUTINE_BLOCKS = [
-  { id: "reading", time: "10:00–11:00", label: "기술 서적 읽기", icon: "📖", color: "#6366F1" },
-  { id: "interview", time: "11:00–12:00", label: "면접 연습", icon: "🎯", color: "#4ECDC4" },
-  { id: "lunch", time: "12:00–13:00", label: "점심 + 휴식", icon: "🍚", color: "#9CA3AF" },
-  { id: "jobs", time: "13:00–14:00", label: "채용공고 + 지원", icon: "📋", color: "#F59E0B" },
-  { id: "star", time: "14:00–16:00", label: "STAR 정리 / 이력서", icon: "✏️", color: "#FF6B35" },
-  { id: "break", time: "16:00–16:15", label: "휴식", icon: "☕", color: "#9CA3AF" },
-  { id: "english", time: "16:15–17:00", label: "영어 + 복기", icon: "📝", color: "#A78BFA" },
+  { id: "reading", duration: 60, label: "기술 서적 읽기", icon: "📖", color: "#6366F1" },
+  { id: "interview", duration: 60, label: "면접 연습", icon: "🎯", color: "#4ECDC4" },
+  { id: "lunch", duration: 60, label: "점심 + 휴식", icon: "🍚", color: "#9CA3AF" },
+  { id: "jobs", duration: 60, label: "채용공고 + 지원", icon: "📋", color: "#F59E0B" },
+  { id: "star", duration: 120, label: "STAR 정리 / 이력서", icon: "✏️", color: "#FF6B35" },
+  { id: "break", duration: 15, label: "휴식", icon: "☕", color: "#9CA3AF" },
+  { id: "english", duration: 45, label: "영어 + 복기", icon: "📝", color: "#A78BFA" },
 ];
+
+const DEFAULT_START_HOUR = 10;
+const START_TIME_KEY = "chris-routine-start-time";
+
+const formatTime = (totalMinutes) => {
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
+
+const getBlocksWithTime = (startHour) => {
+  let offset = startHour * 60;
+  return ROUTINE_BLOCKS.map(block => {
+    const start = offset;
+    offset += block.duration;
+    return { ...block, time: `${formatTime(start)}–${formatTime(offset)}` };
+  });
+};
+
+const loadStartTime = () => {
+  try {
+    const val = localStorage.getItem(START_TIME_KEY);
+    return val !== null ? Number(val) : DEFAULT_START_HOUR;
+  } catch { return DEFAULT_START_HOUR; }
+};
 
 const STORAGE_KEY = "chris-routine-tracker";
 const getToday = () => new Date().toISOString().slice(0, 10);
@@ -45,8 +70,15 @@ export default function App() {
   const [data, setData] = useState(() => loadData());
   const [note, setNote] = useState("");
   const [activeTab, setActiveTab] = useState("today");
+  const [startHour, setStartHour] = useState(() => loadStartTime());
   const today = getToday();
   const weekDates = getWeekDates();
+  const blocksWithTime = getBlocksWithTime(startHour);
+
+  const handleStartHourChange = (newHour) => {
+    setStartHour(newHour);
+    try { localStorage.setItem(START_TIME_KEY, String(newHour)); } catch {}
+  };
 
   useEffect(() => {
     if (data[today]?.note) setNote(data[today].note);
@@ -144,6 +176,14 @@ export default function App() {
         </div>
       </div>
 
+      {/* Start Time */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 12, padding: "8px 0" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#888" }}>시작 시간</span>
+        <button onClick={() => handleStartHourChange(Math.max(0, startHour - 1))} style={{ width: 30, height: 30, borderRadius: 8, border: "1.5px solid #e0e0e0", background: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", color: "#555", WebkitTapHighlightColor: "transparent" }}>−</button>
+        <span style={{ fontSize: 18, fontWeight: 800, minWidth: 52, textAlign: "center", color: "#1a1a2e" }}>{String(startHour).padStart(2, "0")}:00</span>
+        <button onClick={() => handleStartHourChange(Math.min(23, startHour + 1))} style={{ width: 30, height: 30, borderRadius: 8, border: "1.5px solid #e0e0e0", background: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", color: "#555", WebkitTapHighlightColor: "transparent" }}>+</button>
+      </div>
+
       {/* Tabs */}
       <div style={{ display: "flex", gap: 4, background: "#f3f4f6", borderRadius: 10, padding: 3, marginBottom: 16 }}>
         {[{ key: "today", label: "오늘" }, { key: "week", label: "이번 주" }, { key: "history", label: "기록" }].map(tab => (
@@ -160,7 +200,7 @@ export default function App() {
       {/* TODAY */}
       {activeTab === "today" && (
         <>
-          {ROUTINE_BLOCKS.map(block => {
+          {blocksWithTime.map(block => {
             const bd = data[today]?.blocks?.[block.id];
             const isDone = bd?.status === "done";
             const isSkip = bd?.status === "skip";
